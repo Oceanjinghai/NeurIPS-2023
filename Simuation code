@@ -1,0 +1,191 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SimpleNN(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(SimpleNN, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+def element_wise_product_and_sum(data, weights, axes):
+    product = data[:, :, None] * weights
+    return np.sum(product, axis=tuple(axes))
+
+def torch_neural_network_combination(data, model):
+    data_tensor = torch.tensor(data, dtype=torch.float32)
+    output_tensor = model(data_tensor)
+    return output_tensor.detach().numpy()
+
+def reduce_dimensionality(data, method, **kwargs):
+    """
+    Reduce dimensionality of a high-dimensional np.array using a combination method.
+
+    Parameters:
+    data (np.array): High-dimensional input data.
+    method (str): Combination method to use for dimensionality reduction.
+                  Options: 'select_dimension', 'linear_combination', 'element_wise_product_and_sum', 'polynomial_combination', 'torch_neural_network'.
+    **kwargs: Additional arguments depending on the combination method.
+    
+    Returns:
+    np.array: Low-dimensional output data.
+    """
+    if method == 'select_dimension':
+        # Select given effective dimension as input
+        dimensions = kwargs.get('dimensions', [])
+        if not dimensions:
+            raise ValueError("No dimensions specified for 'select_dimension' method.")
+        reduced_data = data[:, dimensions]
+
+    elif method == 'linear_combination':
+        # Linear combination using a matrix
+        combination_matrix = kwargs.get('combination_matrix', None)
+        if combination_matrix is None:
+            raise ValueError("No combination matrix specified for 'linear_combination' method.")
+        reduced_data = np.dot(data, combination_matrix)
+
+    elif method == 'element_wise_product_and_sum':
+        # Element-wise product followed by summation along specified axes
+        weights = kwargs.get('weights', None)
+        axes = kwargs.get('axes', (1,))
+        if weights is None:
+            raise ValueError("No weights specified for 'element_wise_product_and_sum' method.")
+        reduced_data = element_wise_product_and_sum(data, weights, axes)
+
+    elif method == 'polynomial_combination':
+        # Polynomial combination
+        coefficients = kwargs.get('coefficients', None)
+        if coefficients is None:
+            raise ValueError("No coefficients specified for 'polynomial_combination' method.")
+        reduced_data = polynomial_combination(data, coefficients)
+
+    elif method == 'torch_neural_network':
+        # PyTorch neural network
+        model = kwargs.get('model', None)
+        if model is None:
+            raise ValueError("No model specified for 'torch_neural_network' method.")
+        reduced_data = torch_neural_network_combination(data, model)
+
+    else:
+        raise ValueError(f"Invalid combination method: {method}")
+
+    return reduced_data
+
+# Example usage:
+data = np.random.rand(100, 300)
+dimensions = [1, 3, 5, 10, 20, 30]
+combination_matrix = np.random.rand(300, 6)
+weights = np.random.rand(300, 6)
+coefficients = np.random.rand(300, 6)
+
+# PyTorch neural network model
+model = SimpleNN(300, 50, 6)
+
+# Load the model's state dict if you have a pre-trained model
+# model.load_state_dict(torch.load("model.pth"))
+
+# Ensure the model is in evaluation mode
+model.eval()
+
+
+# Test every function can be used
+reduced_data_1 = reduce_dimensionality(data, 'select_dimension', dimensions=dimensions)
+reduced_data_2 = reduce_dimensionality(data, 'linear_combination', combination_matrix=combination_matrix)
+reduced_data_3 = reduce_dimensionality(data, 'element_wise_product_and_sum', weights=weights, axes=(1,))
+#reduced_data_4 = reduce_dimensionality(data, 'polynomial_combination', coefficients=coefficients)
+reduced_data_5 = reduce_dimensionality(data, 'torch_neural_network', model=model)
+
+
+
+
+
+original_dim = 300
+reduced_dim = 6
+
+COM_MATRIX = np.random.rand(original_dim, reduced_dim)
+
+
+def logistic_function(x, a, b):
+    return 1 / (1 + np.exp(-(np.dot(a, x) + b)))
+
+def generate_datasets(method, num_datasets, dataset_size, original_dim, reduced_dim):
+    """
+    Generate a group of datasets using the given method.
+
+    Parameters:
+    method (str): Combination method to use for dimensionality reduction.
+    num_datasets (int): Number of datasets to generate.
+    dataset_size (int): Size of each dataset (number of samples).
+    original_dim (int): Original dimension of the input data.
+    reduced_dim (int): Dimension of the reduced data.
+    
+    Returns:
+    list: A list of tuples, each containing an original dataset, its reduced version, and the y values.
+    """
+    #combination_matrix = np.random.rand(original_dim, reduced_dim)
+    combination_matrix =COM_MATRIX
+    dimensions = np.random.choice(range(original_dim), reduced_dim, replace=False)
+    
+    datasets = []
+    for _ in range(num_datasets):
+        # Randomly generate original data
+        original_data = np.random.rand(dataset_size, original_dim)
+
+        # Reduce dimensionality using the specified method and parameters
+        if method == 'select_dimension':
+            #dimensions = np.random.choice(range(original_dim), reduced_dim, replace=False)
+            reduced_data = reduce_dimensionality(original_data, method, dimensions=dimensions)
+
+        elif method == 'linear_combination':
+            #combination_matrix = np.random.rand(original_dim, reduced_dim)
+            reduced_data = reduce_dimensionality(original_data, method, combination_matrix=combination_matrix)
+
+        elif method == 'element_wise_product_and_sum':
+            weights = np.random.rand(original_dim, reduced_dim)
+            axes = (1,)
+            reduced_data = reduce_dimensionality(original_data, method, weights=weights, axes=axes)
+
+        elif method == 'polynomial_combination':
+            coefficients = np.random.rand(original_dim, reduced_dim)
+            reduced_data = reduce_dimensionality(original_data, method, coefficients=coefficients)
+
+        elif method == 'torch_neural_network':
+            model = SimpleNN(original_dim, original_dim // 2, reduced_dim)
+            model.eval()
+            reduced_data = reduce_dimensionality(original_data, method, model=model)
+
+        else:
+            raise ValueError(f"Invalid combination method: {method}")
+
+        # Calculate y values using a logistic mapping with unique parameters for each dataset
+        a = np.random.rand(reduced_dim)
+        b = np.random.rand()
+        y = np.apply_along_axis(logistic_function, 1, reduced_data, a, b)
+
+        # Add the original data, reduced data, and y values to the list of datasets
+        datasets.append((original_data, reduced_data, y))
+
+    return datasets
+
+
+method = 'linear_combination'
+num_datasets = 5
+dataset_size = 1000
+original_dim = 300
+reduced_dim = 6
+
+datasets = generate_datasets(method, num_datasets, dataset_size, original_dim, reduced_dim)
+
+# Access the original, reduced data and y values for each dataset
+for i, (original_data, reduced_data, y) in enumerate(datasets):
+    print(f"Dataset {i + 1}:")
+    print(f"Original data shape: {original_data.shape}")
+    print(f"Reduced data shape: {reduced_data.shape}")
+    print(f"Y values shape: {y.shape}")
+    print()
